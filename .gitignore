@@ -50,6 +50,10 @@ outputs/
 
 project.md
 
+# Local documentation (private notes)
+ARCHITECTURE.md
+AI_AGENT_INTEGRATION.md
+
 # Claude Code private files
 .claude/
 CLAUDE.md
