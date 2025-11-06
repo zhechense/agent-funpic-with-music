@@ -1,0 +1,192 @@
+# Agent-Funpic-Act Cursor Rules
+
+## Tool Overview
+
+This project contains `agent-funpic-act`, a Go CLI tool that creates animated "head shake" videos with music by orchestrating multiple MCP servers.
+
+**What it does:**
+1. Removes image background (person segmentation)
+2. Detects pose landmarks
+3. Creates head shake animation
+4. Adds music from Epidemic Sound
+5. Composes final video with audio
+
+## When to Use
+
+Suggest using this tool when the user:
+- Wants to create animated videos from static images
+- Mentions "generate video", "animate image", "head shake"
+- Needs to process images with background removal
+- Wants to add music to videos
+- Asks about batch processing images
+
+## Command Format
+
+### Basic Usage
+```bash
+./bin/agent --image <path> --duration <seconds>
+```
+
+### With Options
+```bash
+./bin/agent \
+  --image path/to/image.jpg \
+  --duration 10.0 \
+  --config configs/agent.yaml \
+  --manifest .pipeline_manifest.json \
+  --id custom-pipeline-id
+```
+
+## Parameters
+
+| Flag | Required | Default | Description |
+|------|----------|---------|-------------|
+| `--image` | Yes | - | Path to input image (PNG, JPG) |
+| `--duration` | No | 10.0 | Video duration in seconds |
+| `--config` | No | configs/agent.yaml | Configuration file path |
+| `--manifest` | No | from config | Pipeline state file for resume |
+| `--id` | No | auto-generated | Pipeline ID for tracking/resume |
+
+## Common Use Cases
+
+### 1. Quick Test Video
+```bash
+./bin/agent --image test.jpg --duration 5
+```
+
+### 2. Custom Duration
+```bash
+./bin/agent --image portrait.png --duration 15.0
+```
+
+### 3. Resume Failed Pipeline
+```bash
+./bin/agent --image img.jpg --id pipeline-123 --manifest .pipeline_manifest.json
+```
+
+### 4. Batch Processing
+Use the batch script:
+```bash
+./scripts/batch-process.sh images/*.jpg
+```
+
+## Prerequisites Check
+
+Before running, verify:
+```bash
+# Check if agent is built
+test -f ./bin/agent || make build
+
+# Check environment variables
+grep -q "EPIDEMIC_SOUND_TOKEN" .env || echo "⚠️  Set EPIDEMIC_SOUND_TOKEN in .env"
+
+# Check MCP servers
+make test-mcp-servers
+```
+
+## Output Files
+
+The agent creates these files:
+- `/tmp/segmented_person.png` - Background-removed image
+- `/tmp/headshake_animation.mp4` - Animated video without music
+- `/tmp/final_headshake_with_music.mp4` - Final video with music
+- `.pipeline_manifest.json` - Pipeline state (for resume)
+
+## Error Handling
+
+### Common Issues
+
+**"EPIDEMIC_SOUND_TOKEN not set"**
+- Action: Edit `.env` file and add token
+
+**"MCP server connection failed"**
+- Action: Run `make test-mcp-servers` to verify installations
+
+**"Pipeline stage failed"**
+- Action: Check `.pipeline_manifest.json` for error details
+- Resume: Use same `--id` to retry from failed stage
+
+## AI Assistant Guidelines
+
+When helping users with this tool:
+
+1. **Always check prerequisites first**:
+   - Is the agent built? (`./bin/agent` exists?)
+   - Is `.env` configured?
+   - Are MCP servers installed?
+
+2. **Construct commands with absolute paths**:
+   ```bash
+   # Good
+   ./bin/agent --image $(pwd)/myimage.jpg --duration 10
+
+   # Avoid relative paths outside project
+   ```
+
+3. **For batch processing**:
+   - Suggest using the batch script
+   - Or create a loop with proper error handling
+
+4. **When errors occur**:
+   - Read the error message
+   - Check `.pipeline_manifest.json` for details
+   - Suggest specific fixes based on the error
+
+5. **Suggest VS Code tasks**:
+   - Run Task: "Generate Video - Quick Test"
+   - Run Task: "Generate Video - Interactive"
+   - Run Task: "Batch Process Images"
+
+## VS Code Tasks
+
+Users can run predefined tasks via `Cmd+Shift+P` → "Tasks: Run Task":
+- `Generate Video - Quick Test` - Quick 5s video
+- `Generate Video - Interactive` - Prompts for parameters
+- `Batch Process Images` - Process multiple files
+- `Test MCP Servers` - Verify server installations
+- `Build Agent` - Rebuild the binary
+
+## Build and Development
+
+```bash
+# Build
+make build
+
+# Test
+make test
+
+# Install MCP servers
+make install-mcp-servers
+
+# Clean
+make clean
+```
+
+## Important Notes
+
+- The tool requires 4 MCP servers (3 local + 1 remote)
+- Pipeline is stateful and resumable
+- Each stage is idempotent (safe to retry)
+- Music requires valid Epidemic Sound API token
+- FFmpeg must be installed for video processing
+
+## Example AI Interactions
+
+User: "Generate a video from this image"
+→ Check if agent is built
+→ Ask for image path
+→ Suggest duration
+→ Construct and explain command
+→ Execute or offer to execute
+
+User: "Process all JPG files in images/"
+→ Suggest batch script
+→ Show command with file pattern
+→ Warn about processing time
+→ Execute or show command
+
+User: "My pipeline failed at render_motion stage"
+→ Check manifest file
+→ Explain the error
+→ Suggest resume command with same ID
+→ Show how to skip problematic stage if needed

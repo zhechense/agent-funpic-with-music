@@ -1,0 +1,61 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# Dependencies
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pipeline state
+.pipeline_manifest.json
+manifest.json
+
+# Environment variables (contains secrets)
+.env
+
+# Temporary files
+/tmp/
+*.tmp
+*.log
+.pipeline_tmp/
+
+# Output directories
+images/
+output/
+outputs/
+
+project.md
+
+# Claude Code private files
+.claude/
+CLAUDE.md
+
+# MCP server virtual environments
+mcp-servers/imagesorcery-env/
+mcp-servers/yolo-service/.venv/
+mcp-servers/video-audio-mcp/.venv/
+agent-funpic-act

@@ -1,0 +1,99 @@
+# Real MCP Server Configuration
+# All servers are now locally installed and configured
+
+servers:
+  # Image processing - Background removal
+  imagesorcery:
+    name: imagesorcery-mcp
+    command:
+      - /Users/zhe.chen/workspace/hackweek/202511/agent-funpic-act/mcp-servers/imagesorcery-env/bin/imagesorcery-mcp
+    transport: stdio
+    timeout: 120s
+    capabilities:
+      tools:
+        - detect      # Object detection with YOLO
+        - fill        # Fill/mask areas for background removal
+        - find        # Find objects by text description
+        - crop
+        - resize
+
+  # Pose estimation and keypoint detection
+  yolo:
+    name: yolo-mcp-server
+    command:
+      - /Users/zhe.chen/workspace/hackweek/202511/agent-funpic-act/mcp-servers/yolo-service/.venv/bin/python
+      - /Users/zhe.chen/workspace/hackweek/202511/agent-funpic-act/mcp-servers/yolo-service/server.py
+    transport: stdio
+    timeout: 120s
+    capabilities:
+      tools:
+        - analyze_image_from_path  # Main tool for pose estimation
+        - segment_objects
+        - classify_image
+
+  # Video and audio composition
+  video:
+    name: video-audio-mcp
+    command:
+      - /Users/zhe.chen/.local/bin/uv
+      - --directory
+      - /Users/zhe.chen/workspace/hackweek/202511/agent-funpic-act/mcp-servers/video-audio-mcp
+      - run
+      - server.py
+    transport: stdio
+    timeout: 180s
+    capabilities:
+      tools:
+        - concatenate_videos
+        - extract_audio_from_video
+        - add_text_overlay
+        - add_image_overlay
+        - convert_video_format
+
+  # Music search (remote HTTP service)
+  music:
+    name: epidemic-sound
+    url: https://www.epidemicsound.com/a/mcp-service/mcp
+    transport: http
+    timeout: 30s
+    headers:
+      Authorization: "Bearer ${EPIDEMIC_SOUND_TOKEN}"
+    capabilities:
+      tools: []  # GraphQL-based, tools discovered dynamically
+
+# Pipeline configuration
+pipeline:
+  enable_motion: true
+  max_retries: 3
+  manifest_path: .pipeline_manifest.json
+
+# LLM configuration (AI Agent features)
+llm:
+  enabled: true
+  provider: gemini  # Options: anthropic, google, openai
+
+  # Provider-specific configurations
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    model: claude-3-5-sonnet-20241022
+    timeout: 30s
+
+  google:
+    api_key: "${GOOGLE_API_KEY}"
+    model: gemini-2.0-flash-exp
+    timeout: 30s
+
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: gpt-4o
+    timeout: 30s
+
+  # AI mode: "lightweight" (pre-planning) or "full_ai" (autonomous conversation)
+  mode: lightweight
+
+  # Full AI mode configuration (only used when mode=full_ai)
+  full_ai:
+    max_rounds: 20          # Max conversation rounds
+    max_tokens: 100000      # Max total tokens (100k)
+    max_cost_usd: 0.50      # Max cost in USD ($0.50)
+    timeout_seconds: 300    # Global timeout (5 minutes)
