@@ -70,7 +70,7 @@ pipeline:
 # LLM configuration (AI Agent features)
 llm:
   enabled: true
-  provider: gemini  # Options: anthropic, google, openai
+  provider: gemini  # Options: anthropic, google, openai, openrouter
 
   # Provider-specific configurations
   anthropic:
@@ -88,8 +88,13 @@ llm:
     model: gpt-4o
     timeout: 30s
 
+  openrouter:
+    api_key: "${OPENROUTER_API_KEY}"
+    model: anthropic/claude-3.5-sonnet  # OpenRouter model format: provider/model
+    timeout: 30s
+
   # AI mode: "lightweight" (pre-planning) or "full_ai" (autonomous conversation)
-  mode: lightweight
+  mode: full_ai
 
   # Full AI mode configuration (only used when mode=full_ai)
   full_ai:

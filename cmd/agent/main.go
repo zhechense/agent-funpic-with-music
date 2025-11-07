@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/zhe.chen/agent-funpic-act/internal/llm/providers/claude"
 	"github.com/zhe.chen/agent-funpic-act/internal/llm/providers/gemini"
 	"github.com/zhe.chen/agent-funpic-act/internal/llm/providers/openai"
+	"github.com/zhe.chen/agent-funpic-act/internal/llm/providers/openrouter"
 	"github.com/zhe.chen/agent-funpic-act/internal/pipeline"
 	"github.com/zhe.chen/agent-funpic-act/pkg/types"
 )
@@ -34,11 +36,14 @@ func createLLMProvider(config types.LLMConfig) (llm.Provider, error) {
 	case "openai":
 		return openai.NewProvider(config.OpenAI)
 
+	case "openrouter":
+		return openrouter.NewProvider(config.OpenRouter)
+
 	case "":
 		return nil, fmt.Errorf("llm.provider not specified in config")
 
 	default:
-		return nil, fmt.Errorf("unsupported LLM provider: %s (supported: anthropic, google, openai)", config.Provider)
+		return nil, fmt.Errorf("unsupported LLM provider: %s (supported: anthropic, google, openai, openrouter)", config.Provider)
 	}
 }
 
@@ -57,6 +62,7 @@ func main() {
 		manifestPath = flag.String("manifest", "", "Path to pipeline manifest (default: from config)")
 		pipelineID   = flag.String("id", "", "Pipeline ID for resume (default: auto-generate)")
 		outputDir    = flag.String("output", "output", "Output directory for generated files")
+		model        = flag.String("model", "", "Override LLM model (e.g., 'gemini-1.5-flash')")
 	)
 	flag.Parse()
 
@@ -161,6 +167,19 @@ func main() {
 	// Initialize LLM provider (AI Agent feature)
 	var llmProvider llm.Provider
 	if config.LLM.Enabled {
+		// Model override priority: CLI flag > ENV var > config file
+		if *model != "" {
+			// Command-line flag has highest priority
+			config.LLM.Google.Model = *model
+			config.LLM.Anthropic.Model = *model
+			config.LLM.OpenAI.Model = *model
+			log.Printf("[AI Agent] Using model from CLI flag: %s", *model)
+		} else if envModel := os.Getenv("GEMINI_MODEL"); envModel != "" {
+			// Environment variable has second priority (Gemini-specific)
+			config.LLM.Google.Model = envModel
+			log.Printf("[AI Agent] Using model from GEMINI_MODEL env: %s", envModel)
+		}
+
 		log.Printf("[AI Agent] Initializing LLM provider: %s...", config.LLM.Provider)
 		provider, err := createLLMProvider(config.LLM)
 		if err != nil {
@@ -200,9 +219,15 @@ func main() {
 		aiMode,
 	)
 
+	// Convert image path to absolute path (required for MCP servers)
+	absImagePath, err := filepath.Abs(*imagePath)
+	if err != nil {
+		log.Fatalf("Failed to convert image path to absolute: %v", err)
+	}
+
 	// Prepare input
 	input := types.PipelineInput{
-		ImagePath:  *imagePath,
+		ImagePath:  absImagePath,
 		Duration:   *duration,
 		UserPrompt: *userPrompt,
 		OutputDir:  *outputDir,

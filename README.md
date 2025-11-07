@@ -15,8 +15,8 @@ The agent executes a stateful pipeline with automatic retry and resume capabilit
 ## Features
 
 - **Multi-Server MCP Client**: Connects to multiple MCP servers simultaneously
-- **AI Agent Support**: Multi-provider LLM integration (Claude, Gemini, OpenAI) for autonomous pipeline orchestration
-- **Flexible LLM Providers**: Easy switching between Anthropic Claude, Google Gemini, and OpenAI GPT models via configuration
+- **AI Agent Support**: Multi-provider LLM integration (Claude, Gemini, OpenAI, OpenRouter) for autonomous pipeline orchestration
+- **Flexible LLM Providers**: Easy switching between Anthropic Claude, Google Gemini, OpenAI GPT, and OpenRouter models via configuration
 - **Flexible Transport**: Supports stdio (subprocess) and HTTP (SSE) transports
 - **State Persistence**: JSON manifest enables pipeline resume after failures
 - **Idempotent Execution**: Automatically skips completed stages on resume
@@ -64,6 +64,7 @@ The agent executes a stateful pipeline with automatic retry and resume capabilit
   - Google Gemini API key (recommended, default provider)
   - Anthropic Claude API key
   - OpenAI API key
+  - OpenRouter API key (access 200+ models via unified API)
 - MCP servers:
   - ImageSorcery MCP (Python)
   - YOLO Service (Python)
@@ -109,6 +110,7 @@ The agent uses environment variables to securely store API credentials:
 | `GOOGLE_API_KEY` | Optional | Google Gemini API key (if using Gemini as LLM provider) |
 | `ANTHROPIC_API_KEY` | Optional | Anthropic Claude API key (if using Claude as LLM provider) |
 | `OPENAI_API_KEY` | Optional | OpenAI API key (if using OpenAI as LLM provider) |
+| `OPENROUTER_API_KEY` | Optional | OpenRouter API key (if using OpenRouter as LLM provider) |
 
 **Setup:**
 1. Copy the template: `cp .env.template .env`
@@ -120,6 +122,7 @@ The agent uses environment variables to securely store API credentials:
 - Google Gemini: https://makersuite.google.com/app/apikey
 - Anthropic Claude: https://console.anthropic.com/
 - OpenAI: https://platform.openai.com/api-keys
+- OpenRouter: https://openrouter.ai/keys
 
 The configuration file (`configs/agent.yaml`) uses `${VARIABLE_NAME}` syntax to reference environment variables, which are automatically expanded at runtime.
 
@@ -174,8 +177,11 @@ See [CURSOR_INTEGRATION.md](CURSOR_INTEGRATION.md) for complete guide.
 - `--config`: Path to configuration file (default: `configs/agent.yaml`)
 - `--image`: Path to input image (required)
 - `--duration`: Target duration in seconds (default: `10.0`)
+- `--prompt`: User request for animation style
 - `--manifest`: Path to state manifest file (default: from config)
 - `--id`: Pipeline ID for resume (default: auto-generated)
+- `--output`: Output directory (default: `output`)
+- `--model`: Override LLM model (e.g., `gemini-1.5-flash`, `claude-3-5-sonnet-20241022`)
 
 ## Pipeline Stages
 
@@ -236,7 +242,7 @@ pipeline:
 # AI Agent configuration (optional)
 llm:
   enabled: true
-  provider: gemini  # Options: anthropic, google, openai
+  provider: gemini  # Options: anthropic, google, openai, openrouter
 
   # Provider-specific configurations
   anthropic:
@@ -254,18 +260,24 @@ llm:
     model: gpt-4o
     timeout: 30s
 
+  openrouter:
+    api_key: "${OPENROUTER_API_KEY}"
+    model: anthropic/claude-3.5-sonnet  # OpenRouter model format
+    timeout: 30s
+
   # AI mode: "lightweight" or "full_ai"
   mode: lightweight
 ```
 
 ### Multi-Provider LLM Support
 
-The agent supports three LLM providers for AI-assisted pipeline orchestration:
+The agent supports four LLM providers for AI-assisted pipeline orchestration:
 
 **Supported Providers:**
 - **Google Gemini** (`gemini`): Fast, cost-effective multimodal model (default)
 - **Anthropic Claude** (`anthropic` or `claude`): Advanced reasoning and vision capabilities
 - **OpenAI GPT** (`openai`): Industry-standard multimodal model
+- **OpenRouter** (`openrouter`): Unified API gateway providing access to 200+ models from multiple providers
 
 **Switching Providers:**
 
@@ -273,10 +285,67 @@ Simply change the `provider` field in `configs/agent.yaml`:
 ```yaml
 llm:
   enabled: true
-  provider: gemini  # Change to: anthropic, claude, google, gemini, or openai
+  provider: gemini  # Change to: anthropic, claude, google, gemini, openai, or openrouter
 ```
 
 Each provider has its own configuration section with model name, API key, and timeout settings. The agent automatically routes to the appropriate SDK implementation.
+
+### Switching Models
+
+The agent supports flexible model switching with three priority levels:
+
+**Priority Order (highest to lowest):**
+1. **Command-line flag** (`--model`)
+2. **Environment variable** (`GEMINI_MODEL`)
+3. **Configuration file** (`configs/agent.yaml`)
+
+**Available Gemini Models:**
+
+| Model | Speed | Cost | RPD Limit (Free) | Best For | Status |
+|-------|-------|------|------------------|----------|--------|
+| **Gemini 2.5 Series** |
+| `gemini-2.5-pro` | ⚡⚡ | $$$ | 50/day | State-of-the-art reasoning | ✅ Stable |
+| `gemini-2.5-flash` | ⚡⚡⚡ | $ | 1000/day | Best price-performance | ✅ Stable |
+| `gemini-2.5-flash-lite` | ⚡⚡⚡⚡ | $ | High | Fastest, cost-efficient | ✅ Stable |
+| `gemini-2.5-flash-preview-09-2025` | ⚡⚡⚡ | Free | ? | Preview features | ⚠️ Preview |
+| `gemini-2.5-flash-lite-preview-09-2025` | ⚡⚡⚡⚡ | Free | ? | Preview lite version | ⚠️ Preview |
+| **Gemini 2.0 Series** |
+| `gemini-2.0-flash-exp` | ⚡⚡⚡ | Free | 50/day | Experimentation | 🧪 Experimental |
+| `gemini-2.0-flash` | ⚡⚡⚡ | $ | 1000/day | Second generation | ✅ Stable |
+| `gemini-2.0-flash-lite` | ⚡⚡⚡⚡ | $ | High | Cost-efficient 2.0 | ✅ Stable |
+| **Gemini 1.5 Series** |
+| `gemini-1.5-flash` | ⚡⚡⚡ | $ | 1500/day | Production workhorse | ✅ Stable |
+| `gemini-1.5-pro` | ⚡⚡ | $$ | 50/day | Complex reasoning | ✅ Stable |
+| `gemini-1.5-flash-8b` | ⚡⚡⚡⚡ | $ | 4000/day | High-frequency calls | ✅ Stable |
+
+**Notes:**
+- Speed: ⚡ (slower) to ⚡⚡⚡⚡ (fastest)
+- RPD Limit: Requests Per Day for free tier
+- Status: ✅ Stable | ⚠️ Preview (2-week deprecation notice) | 🧪 Experimental
+- When hitting rate limits (Error 429), switch to models with higher RPD limits or stable versions
+
+**Usage Examples:**
+
+```bash
+# 1. Quick switch via CLI flag (recommended for testing)
+./bin/agent --model gemini-1.5-flash --image test.jpg --duration 10
+
+# 2. Use environment variable (good for different environments)
+export GEMINI_MODEL=gemini-1.5-pro
+./bin/agent --image test.jpg --duration 10
+
+# 3. Edit config file (permanent default)
+# In configs/agent.yaml:
+#   google:
+#     model: gemini-1.5-flash-8b
+```
+
+**When to Switch Models:**
+
+- **Hit RPD limit**: Switch from `gemini-2.0-flash-exp` (50/day) to `gemini-1.5-flash-8b` (4000/day)
+- **Need better quality**: Switch from `flash` models to `gemini-1.5-pro`
+- **Cost optimization**: Use `gemini-1.5-flash-8b` for lightweight tasks
+- **Testing**: Use `--model` flag to quickly compare different models
 
 ## Development
 
@@ -360,7 +429,8 @@ agent-funpic-act/
 │   │   └── providers/              # Provider implementations
 │   │       ├── claude/             # Anthropic Claude
 │   │       ├── gemini/             # Google Gemini
-│   │       └── openai/             # OpenAI GPT
+│   │       ├── openai/             # OpenAI GPT
+│   │       └── openrouter/         # OpenRouter Gateway
 │   └── pipeline/                   # Pipeline orchestration
 │       ├── pipeline.go             # Main orchestrator
 │       ├── manifest.go             # State persistence
@@ -391,6 +461,37 @@ This agent implements the Model Context Protocol (MCP) version 2025-03-26:
 - HTTP transport uses `mark3labs/mcp-go` library for Streamable HTTP support
 
 ## Troubleshooting
+
+### Gemini API Rate Limits
+
+**Error 429: Resource exhausted**
+```
+Pipeline execution failed: Error 429, Message: Resource exhausted.
+Please try again later.
+```
+
+This error means you've hit Gemini API's rate limits. Solutions:
+
+1. **Switch to higher-limit models:**
+   ```bash
+   # From gemini-2.0-flash-exp (50/day) to:
+   ./bin/agent --model gemini-1.5-flash-8b --image test.jpg   # 4000/day
+   ./bin/agent --model gemini-1.5-flash --image test.jpg      # 1500/day
+   ./bin/agent --model gemini-2.5-flash --image test.jpg      # 1000/day
+   ```
+
+2. **Wait for rate limit reset:** Free tier limits reset every 24 hours
+
+3. **Use paid tier:** Upgrade to Google Cloud for higher quotas
+
+4. **Switch LLM provider:** Try Claude or OpenAI (see Multi-Provider LLM Support)
+
+**No text or tool calls in response**
+
+This can also indicate rate limiting or safety filters. Try:
+- Switching to a different model variant
+- Waiting 5-10 minutes before retrying
+- Using a stable release model instead of experimental/preview versions
 
 ### Environment Variable Issues
 

@@ -57,9 +57,13 @@ func detectMediaType(path string) string {
 
 // CreateVideoGenerationPrompt creates a prompt for video generation task
 func CreateVideoGenerationPrompt(duration float64, imagePath string, toolsDescription string) string {
-	return fmt.Sprintf(`You are a video generation assistant. Your task is to analyze the provided image and **ACTUALLY GENERATE** a %.1f-second animated video file using available tools.
+	return fmt.Sprintf(`You are a video generation assistant. Your task is to analyze the provided image and **ACTUALLY GENERATE** a %.1f-second animated video file with background music.
 
-**IMPORTANT**: Your goal is to produce an actual video file, not just return commands or suggestions. Use the available MCP tools to complete the video generation.
+**CRITICAL REQUIREMENTS**:
+1. Segment person from background (remove background)
+2. Generate animation from the segmented image
+3. Search and add background music to the video
+4. Return the path to the final video file with music
 
 ## Input Image Information
 - **Image Path**: %s
@@ -67,46 +71,62 @@ func CreateVideoGenerationPrompt(duration float64, imagePath string, toolsDescri
 
 %s
 
-## Suggested Workflow
+## Required Workflow (Execute ALL steps)
 
-1. **Analyze Image**
-   - Identify image content (people, background, scene, mood)
-   - Assess image quality (clarity, lighting)
-   - Determine if there are people in the image
+### Step 0: Segment Person (Background Removal)
+- Use imagesorcery__find to detect the person and get their polygon coordinates
+- Parameters:
+  - input_path: Use the absolute path above
+  - description: "person"
+  - model: "yoloe-11s-seg.pt"
+  - confidence: 0.25
+  - return_geometry: true
+  - geometry_format: "polygon"
+- Extract the polygon from the result
+- Use imagesorcery__fill to remove the background
+- Parameters:
+  - input_path: Use the absolute path above
+  - areas: [{"polygon": <polygon from find>, "opacity": 0.0}]
+  - invert_areas: true
+  - output_path: Create unique filename (e.g., "segmented_person_<timestamp>.png")
+- Save the segmented image path for use in Step 1
+- **IMPORTANT**: Use the segmented image (not the original) in subsequent steps
 
-2. **Background Processing** (optional)
-   - If the background is complex and you need to highlight people, use imagesorcery__detect and imagesorcery__fill
-   - If the background is simple or solid color, skip this step
-   - Note: imagesorcery tools require complete absolute paths
+### Step 1: Generate Animation
+- Use video__generate_animation_from_image to create the animation
+- Parameters:
+  - image_path: Use the SEGMENTED image path from Step 0 (not the original image)
+  - output_video_path: Create a unique filename in the working directory (e.g., "animation_nod_<timestamp>.mp4")
+  - duration: %.1f
+  - animation_type: Choose appropriate camera effect:
+    * "rotate": Rotates entire image left-right (simulates head shake), intensity in degrees
+    * "shake": Moves entire image left-right horizontally, intensity in pixels
+    * "nod": Moves entire image up-down vertically (simulates nodding), intensity in pixels
+    * "zoom": Zooms image in/out, intensity as scale factor (0.1 = 10 percent)
+  - intensity:
+    * For sad/slow effects: use LOW values (rotate: 3-5 degrees, nod/shake: 3-5 pixels)
+    * For happy/energetic: use HIGHER values (rotate: 10-15, nod/shake: 10-15)
+    * For zoom: always use 0.05-0.15
+- Save the output video path for the next step
 
-3. **Pose Estimation** (if people detected)
-   - Use yolo__analyze_image_from_path to detect facial keypoints
-   - This is important for generating natural animations
+### Step 2: Search Background Music
+- Use music__SearchRecordings to find suitable music
+- **IMPORTANT**: Only pass {"first": 3} - do NOT pass "query" parameter
+- Select the first track from the results
 
-4. **Animation Generation**
-   - Based on pose information and user's request, create the animation
-   - You can either:
-     a) Use available video tools to generate the animation
-     b) If no suitable tool exists, return FFmpeg parameters as JSON for manual execution
-   - Prefer calling tools over returning commands
-
-5. **Music Search** (optional)
-   - Based on image content and mood, use music__SearchRecordings to find suitable music
-   - **IMPORTANT**: Only pass the "first" parameter (e.g., {"first": 5}) - do NOT pass "query" parameter
-   - The "first" parameter specifies how many music tracks to return (typically 3-5)
-   - Example: music__SearchRecordings with {"first": 5}
-   - If music search fails, skip this step and continue with video generation
-
-6. **Final Composition**
-   - Compose animation and music into final video
+### Step 3: Compose Final Video with Music
+- Extract the music track's download URL from the search results
+- Use video__add_audio_to_video or similar tool to combine:
+  - Video: The animation video from Step 1
+  - Audio: The downloaded music track
+  - Output: A final video file with music (e.g., "final_video_with_music_<timestamp>.mp4")
 
 ## Important Notes
 
-- **File Path**: All tool calls MUST use the complete absolute path provided above: %s
-- **Efficiency First**: Skip unnecessary steps (e.g., no need to remove solid color backgrounds)
-- **Explain Decisions**: Briefly explain your reasoning for each step
-- **Error Handling**: If a tool fails (e.g., music search), skip it and continue with other steps
-- **Step-by-step Execution**: Call one tool at a time, wait for results before continuing
+- **File Paths**: All tool calls MUST use complete absolute paths
+- **Do NOT skip steps**: Music is REQUIRED, not optional
+- **Output**: Return the path to the final video file that includes both animation and music
+- **Error Handling**: If music search fails, try again once before giving up
 
-Now, please begin analyzing the image and executing the task.`, duration, imagePath, toolsDescription, imagePath)
+Now, please begin executing ALL THREE STEPS in order.`, duration, imagePath, toolsDescription, duration)
 }

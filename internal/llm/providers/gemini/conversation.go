@@ -162,6 +162,11 @@ func (c *Conversation) Execute(ctx context.Context, imagePath string, duration f
 			candidate := resp.Candidates[0]
 
 			// Check for tool calls
+		// Check if Content is nil (safety filter, etc.)
+		if candidate.Content == nil {
+			return "", fmt.Errorf("candidate has nil content (possibly blocked by safety filter)")
+		}
+
 			hasToolCalls := false
 			for _, part := range candidate.Content.Parts {
 				if part.FunctionCall != nil {

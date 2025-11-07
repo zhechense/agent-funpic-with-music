@@ -32,14 +32,15 @@ type PipelineConfig struct {
 // LLMConfig defines LLM/AI Agent configuration
 type LLMConfig struct {
 	Enabled  bool          `yaml:"enabled"`
-	Provider string        `yaml:"provider"` // "anthropic", "google", "openai"
+	Provider string        `yaml:"provider"` // "anthropic", "google", "openai", "openrouter"
 	Mode     string        `yaml:"mode"`     // "lightweight" or "full_ai"
 	FullAI FullAIConfig `yaml:"full_ai"`
 
 	// Provider-specific configurations
-	Anthropic AnthropicConfig `yaml:"anthropic"`
-	Google    GoogleConfig    `yaml:"google"`
-	OpenAI    OpenAIConfig    `yaml:"openai"`
+	Anthropic  AnthropicConfig  `yaml:"anthropic"`
+	Google     GoogleConfig     `yaml:"google"`
+	OpenAI     OpenAIConfig     `yaml:"openai"`
+	OpenRouter OpenRouterConfig `yaml:"openrouter"`
 }
 
 // FullAIConfig defines limits for full AI agent mode
@@ -71,6 +72,13 @@ type OpenAIConfig struct {
 	Model        string        `yaml:"model"`        // e.g., "gpt-4o"
 	Organization string        `yaml:"organization"` // Optional
 	Timeout      time.Duration `yaml:"timeout"`
+}
+
+// OpenRouterConfig for OpenRouter proxy service
+type OpenRouterConfig struct {
+	APIKey  string        `yaml:"api_key"`
+	Model   string        `yaml:"model"`   // e.g., "anthropic/claude-3.5-sonnet"
+	Timeout time.Duration `yaml:"timeout"`
 }
 
 // Tool represents an MCP tool definition
